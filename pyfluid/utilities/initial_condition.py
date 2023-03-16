@@ -37,6 +37,9 @@ def initial_condition(ic, nx, ny, Lx, Ly):
         u, v = np.zeros((ny, nx)), np.zeros((ny, nx))
         u[int(ny/4):int(3*ny/4), int(nx/4):int(3*nx/4)] = 1
         v[int(ny/4):int(3*ny/4), int(nx/4):int(3*nx/4)] = 1
+    elif ic == 'constant2':
+        u, v = np.zeros((ny, nx)), np.zeros((ny, nx))
+        u = np.ones((ny, nx)) * 1
     elif ic == 'gaussian':
         u, v = np.zeros((ny, nx)), np.zeros((ny, nx))
         r = np.sqrt((X-Lx/2)**2 + (Y-Ly/2)**2)

@@ -26,6 +26,9 @@ from utilities.boundary_condition import boundary_condition
 
 def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
+    # Convergence tolerance
+    tolerance = 1e-6
+
     dx = Lx/(nx-1)   # Grid spacing in x
     dy = Ly/(ny-1)   # Grid spacing in y
 
@@ -47,6 +50,19 @@ def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                           nu*(dt/dx**2)*(vn[i, j+1] - 2*vn[i, j] + vn[i, j-1]) + \
                           nu*(dt/dy**2)*(vn[i+1, j] - 2*vn[i, j] + vn[i-1, j])
 
+        # Calculate the L2 norm of the differences between consecutive time steps
+        u_diff_norm = np.linalg.norm(u - un)
+        v_diff_norm = np.linalg.norm(v - vn)
+
+        # Print the norms every 100 steps
+        if n % 100 == 0:
+            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}")
+
+        # Check if the norms fall below the convergence tolerance
+        if u_diff_norm < tolerance and v_diff_norm < tolerance and n != 0:
+            print(f"Converged after {n} time steps")
+            break
+
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
 
@@ -54,10 +70,11 @@ def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
 def solve_2d_navier_stokes_p(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
+    # Convergence tolerance
+    tolerance = 1e-6
+
     dx = Lx/(nx-1)   # Grid spacing in x
     dy = Ly/(ny-1)   # Grid spacing in y
-
-    rho = 1 # Set constant density for simplicity reason
 
     # Initialize velocity field and pressure
     u, v = initial_condition(ic, nx, ny, Lx, Ly)
@@ -84,16 +101,76 @@ def solve_2d_navier_stokes_p(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                 # Compute velocity field
                 u[i, j] = un[i, j] - un[i, j]*(dt/dx)*(un[i, j] - un[i, j-1]) - \
                           vn[i, j]*(dt/dy)*(un[i, j] - un[i-1, j]) - \
-                          (dt/(2*rho*dx))*(p[i, j+1] - p[i, j-1]) + \
+                          (dt/(2*dx))*(p[i, j+1] - p[i, j-1]) + \
                           nu*(dt/dx**2)*(un[i, j+1] - 2*un[i, j] + un[i, j-1]) + \
                           nu*(dt/dy**2)*(un[i+1, j] - 2*un[i, j] + un[i-1, j])
                 v[i, j] = vn[i, j] - un[i, j]*(dt/dx)*(vn[i, j] - vn[i, j-1]) - \
                           vn[i, j]*(dt/dy)*(vn[i, j] - vn[i-1, j]) - \
-                          (dt/(2*rho*dy))*(p[i+1, j] - p[i-1, j]) + \
+                          (dt/(2*dy))*(p[i+1, j] - p[i-1, j]) + \
                           nu*(dt/dx**2)*(vn[i, j+1] - 2*vn[i, j] + vn[i, j-1]) + \
                           nu*(dt/dy**2)*(vn[i+1, j] - 2*vn[i, j] + vn[i-1, j])
 
+        # Calculate the L2 norm of the differences between consecutive time steps
+        u_diff_norm = np.linalg.norm(u - un)
+        v_diff_norm = np.linalg.norm(v - vn)
+        p_diff_norm = np.linalg.norm(p - pn)
+
+        # Print the norms every 100 steps
+        if n % 100 == 0:
+            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}, p_diff_norm = {p_diff_norm}")
+
+        # Check if the norms fall below the convergence tolerance
+        if u_diff_norm < tolerance and v_diff_norm < tolerance and p_diff_norm < tolerance and n != 0:
+            print(f"Converged after {n} time steps")
+            break
+
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
+
+def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
+
+    dx = Lx/(nx-1)   # Grid spacing in x
+    dy = Ly/(ny-1)   # Grid spacing in y
+
+    # Initialize velocity field and pressure
+    u, v = initial_condition(ic, nx, ny, Lx, Ly)
+    p = np.zeros((ny, nx))
+
+    # Define indices for interior points
+    I, J = np.arange(1, ny-1), np.arange(1, nx-1)
+    Ip, Im, Jp, Jm = I+1, I-1, J+1, J-1
+
+    # Main loop
+    for n in range(nt):
+        un = u.copy()
+        vn = v.copy()
+        pn = p.copy()
+
+        # Poisson equation for the pressure field
+        p[I, J] = ((pn[I, Jp]*dy**2 + pn[I, Jm]*dy**2 +
+                    pn[Ip, J]*dx**2 + pn[Im, J]*dx**2) -
+                   (dx**2 * dy**2) / (2 * (dx**2 + dy**2)) *
+                   (1 / dt * ((u[I, Jp] - u[I, Jm])/(2*dx) + (v[Ip, J] - v[Im, J])/(2*dy)) -
+                    ((u[I, Jp] - u[I, Jm])/(2*dx))**2 -
+                    2*((u[Ip, J] - u[Im, J])/(2*dy)*(v[I, Jp] - v[I, Jm])/(2*dx)) -
+                    ((v[Ip, J] - v[Im, J])/(2*dy))**2))
+
+        # Compute velocity field
+        u[I, J] = (un[I, J] - un[I, J]*(dt/dx)*(un[I, J] - un[I, Jm]) -
+                   vn[I, J]*(dt/dy)*(un[I, J] - un[Im, J]) -
+                   (dt/(2*dx))*(p[I, Jp] - p[I, Jm]) +
+                   nu*(dt/dx**2)*(un[I, Jp] - 2*un[I, J] + un[I, Jm]) +
+                   nu*(dt/dy**2)*(un[Ip, J] - 2*un[I, J] + un[Im, J]))
+
+        v[I, J] = (vn[I, J] - un[I, J]*(dt/dx)*(vn[I, J] - vn[I, Jm]) -
+                   vn[I, J]*(dt/dy)*(vn[I, J] - vn[Im, J]) -
+                   (dt/(2*dy))*(p[Ip, J] - p[Im, J]) +
+                   nu*(dt/dx**2)*(vn[I, Jp] - 2*vn[I, J] + vn[I, Jm]) +
+                   nu*(dt/dy**2)*(vn[Ip, J] - 2*vn[I, J] + vn[Im, J]))
+
+        # Apply boundary conditions
+        u, v = boundary_condition(bc, u, v)
+
+    return u, v, p
 
     return u, v, p

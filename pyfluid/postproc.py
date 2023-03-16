@@ -8,7 +8,6 @@ from utilities.visualisation_plot import plot_uvp_xy
 
 if __name__ == '__main__':
 
-
     # Get the script's directory
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -30,15 +29,35 @@ if __name__ == '__main__':
     cfd_initsc = parameters["Initial_condition"] 
     cfd_boundc = parameters["Boundary_condition"]
 
-    # Main loop
-    #u, v = solve_2d_navier_stokes('constant', 'constant', nx, ny, Lx, Ly, nu, nt, dt)
-    u, v, p = solve_2d_navier_stokes_p(cfd_initsc, cfd_boundc, nx, ny, Lx, Ly, nu, nt, dt)
-
-    # Save u,v,p to a binary file
-    np.save("velocity_u.npy", u)
-    np.save("velocity_v.npy", v)
-    np.save("pressure.npy", p)
+    # Load u,v,p from binary files
+    u = np.load("velocity_u.npy")
+    v = np.load("velocity_v.npy")
+    p = np.load("pressure.npy")
 
     # Plot the results
-    plot_uvp_xy(u, v, p, Lx, Ly, nx, ny)
+    x = np.linspace(0, Lx, nx)
+    y = np.linspace(0, Ly, ny)
+    X, Y = np.meshgrid(x, y)
+
+    fig, axs = plt.subplots(1, 3, figsize=(16, 4))
+
+    # Plot velocity field
+    axs[0].quiver(X, Y, u.transpose(), v.transpose())
+    axs[0].set_xlabel('x')
+    axs[0].set_ylabel('y')
+    axs[0].set_title('Velocity field')
+
+    # Plot velocity magnitude
+    axs[1].contourf(X, Y, np.sqrt((u.transpose())**2 + (v.transpose())**2))
+    axs[1].set_xlabel('x')
+    axs[1].set_ylabel('y')
+    axs[1].set_title('Velocity magnitude')
+
+    # Plot pressure field
+    cp = axs[2].contourf(X, Y, p.transpose())
+    axs[2].set_xlabel('x')
+    axs[2].set_ylabel('y')
+    axs[2].set_title('Pressure field')
+    plt.colorbar(cp)
+
     plt.show()

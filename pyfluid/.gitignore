@@ -1,0 +1,6 @@
+# Ignore editor-specific files
+.vscode/
+.idea/
+
+# Ignore simulation parameters
+input/*.json
