@@ -57,6 +57,18 @@ def boundary_condition(bc, u, v):
         v[-1, :] = v[-2, :] # Zero v-velocity at the right boundary, set the gradient normal to the boundary to be zero
         v[:, 0] = 0         # No-slip at the bottom boundary
         v[:, -1] = 0        # No-slip at the top boundary
+    elif bc == 'kelvin_helmholtz':
+        """periodic boundary conditions in the x direction and no-slip boundary conditions 
+         in the vertical y direction. """
+        u[0, :] = u[-2, :]   # Periodic BC in x-direction
+        u[-1, :] = u[1, :]
+        u[:, 0] = 0           # No-slip BC in y-direction
+        u[:, -1] = 0
+
+        v[0, :] = v[-2, :]   # Periodic BC in x-direction
+        v[-1, :] = v[1, :]
+        v[:, 0] = 0           # No-slip BC in y-direction
+        v[:, -1] = 0
     else:
         raise ValueError(f"Invalid boundary condition: {bc}")
 

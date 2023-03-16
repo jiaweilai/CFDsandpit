@@ -64,10 +64,22 @@ def initial_condition(ic, nx, ny, Lx, Ly):
         r = np.sqrt((X-Lx/2)**2 + (Y-Ly/2)**2)
         u = np.where(r<0.2, 0, np.where(r<0.3, np.sin(np.pi*(r-0.2)/0.1), 1))
         v = np.where(r<0.2, 0, np.where(r<0.3, -np.cos(np.pi*(r-0.2)/0.1)*np.pi/0.1, 0))
+
     elif ic == 'kelvin_helmholtz':
         u, v = np.zeros((ny, nx)), np.zeros((ny, nx))
-        u = np.where(Y<Ly/2, 1, -1)
-        v = 0.5*np.sin(2*np.pi*X/Lx)
+        # Set the mid point
+        mid_y = ny // 2
+        
+        # Set different velocities for top and bottom layers
+        u[:mid_y, :] = 0.5
+        u[mid_y:, :] = -0.5
+
+        # Add a small perturbation at the interface
+        x = np.linspace(0, Lx, nx)
+        perturbation = 0.1 * np.sin(2 * np.pi * x / Lx)
+        u[mid_y-1, :] += perturbation
+        u[mid_y, :] += perturbation
+
     else:
         raise ValueError(f"Invalid initial condition: {ic}")
 
