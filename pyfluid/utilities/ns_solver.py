@@ -127,7 +127,12 @@ def solve_2d_navier_stokes_p(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
 
+    return u, v, p
+
 def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
+
+    # Convergence tolerance
+    tolerance = 1e-6
 
     dx = Lx/(nx-1)   # Grid spacing in x
     dy = Ly/(ny-1)   # Grid spacing in y
@@ -137,7 +142,7 @@ def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
     p = np.zeros((ny, nx))
 
     # Define indices for interior points
-    I, J = np.arange(1, ny-1), np.arange(1, nx-1)
+    I, J = np.arange(1, ny-1)[:, np.newaxis], np.arange(1, nx-1)
     Ip, Im, Jp, Jm = I+1, I-1, J+1, J-1
 
     # Main loop
@@ -168,9 +173,21 @@ def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                    nu*(dt/dx**2)*(vn[I, Jp] - 2*vn[I, J] + vn[I, Jm]) +
                    nu*(dt/dy**2)*(vn[Ip, J] - 2*vn[I, J] + vn[Im, J]))
 
+        # Calculate the L2 norm of the differences between consecutive time steps
+        u_diff_norm = np.linalg.norm(u - un)
+        v_diff_norm = np.linalg.norm(v - vn)
+        p_diff_norm = np.linalg.norm(p - pn)
+
+        # Print the norms every 100 steps
+        if n % 100 == 0:
+            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}, p_diff_norm = {p_diff_norm}")
+
+        # Check if the norms fall below the convergence tolerance
+        if u_diff_norm < tolerance and v_diff_norm < tolerance and p_diff_norm < tolerance and n != 0:
+            print(f"Converged after {n} time steps")
+            break
+
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
-
-    return u, v, p
 
     return u, v, p

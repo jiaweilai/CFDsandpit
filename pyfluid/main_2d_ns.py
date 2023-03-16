@@ -8,7 +8,6 @@ from utilities.visualisation_plot import plot_uvp_xy
 
 if __name__ == '__main__':
 
-
     # Get the script's directory
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
