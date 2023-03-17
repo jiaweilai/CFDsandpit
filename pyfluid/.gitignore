@@ -4,3 +4,4 @@
 
 # Ignore simulation parameters
 input/*.json
+output/*

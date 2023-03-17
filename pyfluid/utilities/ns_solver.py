@@ -21,8 +21,28 @@ Returns:
 """
 
 import numpy as np
-from utilities.initial_condition import initial_condition
-from utilities.boundary_condition import boundary_condition
+from utilities.initial_condition import initial_condition, initial_condition_rb
+from utilities.boundary_condition import boundary_condition, boundary_condition_rb
+from utilities.utils import save_fields
+
+def check_convergence(n, tolerance, *args):
+    norms = []
+    for i in range(0, len(args), 2):
+        diff_norm = np.linalg.norm(args[i] - args[i+1])
+        norms.append(diff_norm)
+
+    # Print the norms every 100 steps
+    if n % 100 == 0:
+        print(f"Step {n}: ", end="")
+        for i, norm in enumerate(norms):
+            print(f"diff_norm_{i} = {norm}", end=", " if i < len(norms) - 1 else "\n")
+
+    # Check if all norms fall below the convergence tolerance
+    if all(norm < tolerance for norm in norms) and n != 0:
+        print(f"Converged after {n} time steps")
+        return True
+
+    return False
 
 def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
@@ -50,17 +70,13 @@ def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                           nu*(dt/dx**2)*(vn[i, j+1] - 2*vn[i, j] + vn[i, j-1]) + \
                           nu*(dt/dy**2)*(vn[i+1, j] - 2*vn[i, j] + vn[i-1, j])
 
-        # Calculate the L2 norm of the differences between consecutive time steps
-        u_diff_norm = np.linalg.norm(u - un)
-        v_diff_norm = np.linalg.norm(v - vn)
+        # Output data
+        # Save fields every 1000 steps
+        if n % 1000 == 0:
+            save_fields(n, u=u, v=v)
 
-        # Print the norms every 100 steps
-        if n % 100 == 0:
-            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}")
-
-        # Check if the norms fall below the convergence tolerance
-        if u_diff_norm < tolerance and v_diff_norm < tolerance and n != 0:
-            print(f"Converged after {n} time steps")
+        # Check convergence
+        if check_convergence(n, tolerance, u, un, v, vn):
             break
 
         # Apply boundary conditions
@@ -110,18 +126,13 @@ def solve_2d_navier_stokes_p(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                           nu*(dt/dx**2)*(vn[i, j+1] - 2*vn[i, j] + vn[i, j-1]) + \
                           nu*(dt/dy**2)*(vn[i+1, j] - 2*vn[i, j] + vn[i-1, j])
 
-        # Calculate the L2 norm of the differences between consecutive time steps
-        u_diff_norm = np.linalg.norm(u - un)
-        v_diff_norm = np.linalg.norm(v - vn)
-        p_diff_norm = np.linalg.norm(p - pn)
+        # Output data
+        # Save fields every 1000 steps
+        if n % 1000 == 0:
+            save_fields(n, u=u, v=v, p=p)
 
-        # Print the norms every 100 steps
-        if n % 100 == 0:
-            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}, p_diff_norm = {p_diff_norm}")
-
-        # Check if the norms fall below the convergence tolerance
-        if u_diff_norm < tolerance and v_diff_norm < tolerance and p_diff_norm < tolerance and n != 0:
-            print(f"Converged after {n} time steps")
+        # Check convergence
+        if check_convergence(n, tolerance, u, un, v, vn, p, pn):
             break
 
         # Apply boundary conditions
@@ -146,7 +157,7 @@ def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
     Ip, Im, Jp, Jm = I+1, I-1, J+1, J-1
 
     # Main loop
-    for n in range(nt):
+    for n in range(nt+1):
         un = u.copy()
         vn = v.copy()
         pn = p.copy()
@@ -173,21 +184,89 @@ def solve_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
                    nu*(dt/dx**2)*(vn[I, Jp] - 2*vn[I, J] + vn[I, Jm]) +
                    nu*(dt/dy**2)*(vn[Ip, J] - 2*vn[I, J] + vn[Im, J]))
 
-        # Calculate the L2 norm of the differences between consecutive time steps
-        u_diff_norm = np.linalg.norm(u - un)
-        v_diff_norm = np.linalg.norm(v - vn)
-        p_diff_norm = np.linalg.norm(p - pn)
+        # Output data
+        # Save fields every 1000 steps
+        if n % 1000 == 0:
+            save_fields(n, u=u, v=v, p=p)
 
-        # Print the norms every 100 steps
-        if n % 100 == 0:
-            print(f"Step {n}: u_diff_norm = {u_diff_norm}, v_diff_norm = {v_diff_norm}, p_diff_norm = {p_diff_norm}")
-
-        # Check if the norms fall below the convergence tolerance
-        if u_diff_norm < tolerance and v_diff_norm < tolerance and p_diff_norm < tolerance and n != 0:
-            print(f"Converged after {n} time steps")
+        # Check convergence
+        if check_convergence(n, tolerance, u, un, v, vn, p, pn):
             break
 
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
 
     return u, v, p
+
+def solve_2d_navier_stokes_T_vectorized(ic, bc, nx, ny, Lx, Ly, nu, alpha, kappa, nt, dt):
+    """
+    Including temperature variations. 
+    The Boussinesq approximation to account density variations in the buoyancy term.
+    """
+
+    # Convergence tolerance
+    tolerance = 1e-6
+
+    # Gravitational field
+    g = 9.81
+
+    dx = Lx/(nx-1)   # Grid spacing in x
+    dy = Ly/(ny-1)   # Grid spacing in y
+
+    # Initialize velocity field and pressure
+    u, v, T = initial_condition_rb(ic, nx, ny, Lx, Ly)
+    p = np.zeros((ny, nx))
+
+    # Define indices for interior points
+    I, J = np.arange(1, ny-1)[:, np.newaxis], np.arange(1, nx-1)
+    Ip, Im, Jp, Jm = I+1, I-1, J+1, J-1
+
+    # Main loop
+    for n in range(nt+1):
+        un = u.copy()
+        vn = v.copy()
+        Tn = T.copy()
+        pn = p.copy()
+
+        # Poisson equation for the pressure field (with Boussinesq approximation)
+        p[I, J] = ((pn[I, Jp]*dy**2 + pn[I, Jm]*dy**2 +
+                    pn[Ip, J]*dx**2 + pn[Im, J]*dx**2) -
+                   (dx**2 * dy**2) / (2 * (dx**2 + dy**2)) *
+                   (1 / dt * ((u[I, Jp] - u[I, Jm])/(2*dx) + (v[Ip, J] - v[Im, J])/(2*dy)) -
+                    ((u[I, Jp] - u[I, Jm])/(2*dx))**2 -
+                    2*((u[Ip, J] - u[Im, J])/(2*dy)*(v[I, Jp] - v[I, Jm])/(2*dx)) -
+                    ((v[Ip, J] - v[Im, J])/(2*dy))**2) -
+                   (alpha * g * (T[Ip, J] - T[Im, J]) * dy**2 / (2 * (dx**2 + dy**2))))
+
+
+        # Compute velocity field (with Boussinesq approximation)
+        # Update velocity fields with buoyancy term
+        u[I, J] = un[I, J] - un[I, J] * (dt / dx) * (un[I, J] - un[I, J - 1]) - vn[I, J] * (dt / dy) * (un[I, J] - un[I - 1, J]) \
+                  - (dt / (2 * dx)) * (p[I, J + 1] - p[I, J - 1]) \
+                  + nu * (dt / dx ** 2) * (un[I, J + 1] - 2 * un[I, J] + un[I, J - 1]) \
+                  + nu * (dt / dy ** 2) * (un[I + 1, J] - 2 * un[I, J] + un[I - 1, J])
+
+        v[I, J] = vn[I, J] - un[I, J] * (dt / dx) * (vn[I, J] - vn[I, J - 1]) - vn[I, J] * (dt / dy) * (vn[I, J] - vn[I - 1, J]) \
+                    - (dt / (2 * dy)) * (p[I + 1, J] - p[I - 1, J]) \
+                    + nu * (dt / dx ** 2) * (vn[I, J + 1] - 2 * vn[I, J] + vn[I, J - 1]) \
+                    + nu * (dt / dy ** 2) * (vn[I + 1, J] - 2 * vn[I, J] + vn[I - 1, J]) \
+                    + alpha * g * dt * (Tn[I, J] - Tn[I - 1, J])  # Add buoyancy term
+
+        # Update temperature field
+        T[I, J] = Tn[I, J] - un[I, J] * (dt / dx) * (Tn[I, J] - Tn[I, J - 1]) - vn[I, J] * (dt / dy) * (Tn[I, J] - Tn[I - 1, J]) \
+                  + kappa * (dt / dx ** 2) * (Tn[I, J + 1] - 2 * Tn[I, J] + Tn[I, J - 1]) \
+                  + kappa * (dt / dy ** 2) * (Tn[I + 1, J] - 2 * Tn[I, J] + Tn[I - 1, J])
+
+        # Output data
+        # Save fields every 1000 steps
+        if n % 1000 == 0:
+            save_fields(n, u=u, v=v, p=p, T=T)
+
+        # Check convergence
+        if check_convergence(n, tolerance, u, un, v, vn, p, pn, T, Tn):
+            break
+
+        # Apply boundary conditions
+        u, v, T = boundary_condition_rb(bc, u, v, T)
+
+    return u, v, p, T

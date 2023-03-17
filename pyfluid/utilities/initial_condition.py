@@ -84,3 +84,17 @@ def initial_condition(ic, nx, ny, Lx, Ly):
         raise ValueError(f"Invalid initial condition: {ic}")
 
     return u, v
+
+def initial_condition_rb(ic, nx, ny, Lx, Ly):
+    u = np.zeros((ny, nx))
+    v = np.zeros((ny, nx))
+    T = np.zeros((ny, nx))
+
+    if ic == 'rand':
+        T = np.random.rand(ny, nx) * 0.1
+        T[:, 0] = 1  # Hot bottom boundary
+        T[:, -1] = 0  # Cold top boundary
+    else:
+        raise ValueError(f"Invalid initial condition: {ic}")
+
+    return u, v, T

@@ -73,3 +73,25 @@ def boundary_condition(bc, u, v):
         raise ValueError(f"Invalid boundary condition: {bc}")
 
     return u, v
+
+def boundary_condition_rb(bc, u, v, T):
+    if bc == 'no_slip':
+        # No-slip condition for u and v
+        u[0, :] = 0
+        u[-1, :] = 0
+        u[:, 0] = 0
+        u[:, -1] = 0
+        v[0, :] = 0
+        v[-1, :] = 0
+        v[:, 0] = 0
+        v[:, -1] = 0
+
+        # Dirichlet condition for temperature
+        T[:, 0] = 1  # Hot bottom boundary
+        T[:, -1] = 0  # Cold top boundary
+        T[0, :] = T[1, :]  # Insulated left boundary
+        T[-1, :] = T[-2, :]  # Insulated right boundary
+    else:
+        raise ValueError(f"Invalid boundary condition: {bc}")
+
+    return u, v, T
