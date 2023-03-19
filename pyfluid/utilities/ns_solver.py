@@ -1,5 +1,6 @@
 """
 Solves the 2D Navier-Stokes equations for incompressible flow with constant viscosity using a finite-difference method.
+Forward Euler method for time advancing.
 
 The first-order derivatives are approximated using a central difference scheme, 
 and the second-order derivatives are approximated using a second-order central difference scheme.
@@ -23,26 +24,7 @@ Returns:
 import numpy as np
 from utilities.initial_condition import initial_condition, initial_condition_rb
 from utilities.boundary_condition import boundary_condition, boundary_condition_rb
-from utilities.utils import save_fields
-
-def check_convergence(n, tolerance, *args):
-    norms = []
-    for i in range(0, len(args), 2):
-        diff_norm = np.linalg.norm(args[i] - args[i+1])
-        norms.append(diff_norm)
-
-    # Print the norms every 100 steps
-    if n % 100 == 0:
-        print(f"Step {n}: ", end="")
-        for i, norm in enumerate(norms):
-            print(f"diff_norm_{i} = {norm}", end=", " if i < len(norms) - 1 else "\n")
-
-    # Check if all norms fall below the convergence tolerance
-    if all(norm < tolerance for norm in norms) and n != 0:
-        print(f"Converged after {n} time steps")
-        return True
-
-    return False
+from utilities.utils import save_fields, check_convergence
 
 def solve_2d_navier_stokes(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
