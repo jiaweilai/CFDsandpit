@@ -4,40 +4,45 @@ from utilities.boundary_condition import boundary_condition, boundary_condition_
 from utilities.utils import save_fields, check_convergence
 
 def backward_euler_method(u, v, p, I, J, Ip, Im, Jp, Jm, nu, dt, dx, dy, max_iter=100, tol=1e-6):
+
+    # Make copies of velocity fields u, v
     u_new = u.copy()
     v_new = v.copy()
+    p_new = p.copy()
 
+    # Iterate until solution converges or max_iter is reached
     for _ in range(max_iter):
         u_prev = u_new.copy()
         v_prev = v_new.copy()
 
-        # Poisson equation for the pressure field
-        p[I, J] = ((p[I, Jp] * dy ** 2 + p[I, Jm] * dy ** 2 +
+        # precompute derivative terms
+        dudx = (u_prev[I, Jp] - u_prev[I, Jm]) / (2 * dx)
+        dvdy = (v_prev[Ip, J] - v_prev[Im, J]) / (2 * dy)
+        dudy = (u_prev[Ip, J] - u_prev[Im, J]) / (2 * dy)
+        dvdx = (v_prev[I, Jp] - v_prev[I, Jm]) / (2 * dx)
+
+        # Poisson equation for the pressure field using finite difference method
+        p_new[I, J] = ((p[I, Jp] * dy ** 2 + p[I, Jm] * dy ** 2 +
                     p[Ip, J] * dx ** 2 + p[Im, J] * dx ** 2) -
                    (dx ** 2 * dy ** 2) / (2 * (dx ** 2 + dy ** 2)) *
-                   (1 / dt * ((u_prev[I, Jp] - u_prev[I, Jm]) / (2 * dx) + (v_prev[Ip, J] - v_prev[Im, J]) / (2 * dy)) -
-                    ((u_prev[I, Jp] - u_prev[I, Jm]) / (2 * dx)) ** 2 -
-                    2 * ((u_prev[Ip, J] - u_prev[Im, J]) / (2 * dy) * (v_prev[I, Jp] - v_prev[I, Jm]) / (2 * dx)) -
-                    ((v_prev[Ip, J] - v_prev[Im, J]) / (2 * dy)) ** 2))
+                   (1 / dt * (dudx + dvdy) - dudx ** 2 - 2 * dudy * dvdx - dvdy ** 2))
 
-        # Compute velocity field using the backward Euler method
-        u_new[I, J] = (u[I, J] - u_prev[I, J] * (dt / dx) * (u_prev[I, J] - u_prev[I, Jm]) -
-                       v_prev[I, J] * (dt / dy) * (u_prev[I, J] - u_prev[Im, J]) -
+        # Compute velocity fields u, v using the backward Euler method
+        u_new[I, J] = (u[I, J] - u_prev[I, J] * (dt / dx) * dudx -
+                       v_prev[I, J] * (dt / dy) * dudy -
                        (dt / (2 * dx)) * (p[I, Jp] - p[I, Jm]) +
                        nu * (dt / dx ** 2) * (u_prev[I, Jp] - 2 * u_prev[I, J] + u_prev[I, Jm]) +
                        nu * (dt / dy ** 2) * (u_prev[Ip, J] - 2 * u_prev[I, J] + u_prev[Im, J]))
-
-        v_new[I, J] = (v[I, J] - u_prev[I, J] * (dt / dx) * (v_prev[I, J] - v_prev[I, Jm]) -
-                       v_prev[I, J] * (dt / dy) * (v_prev[I, J] - v_prev[Im, J]) -
+                                                                         
+        v_new[I, J] = (v[I, J] - u_prev[I, J] * (dt / dx) * dvdx -
+                       v_prev[I, J] * (dt / dy) * dvdy -
                        (dt / (2 * dy)) * (p[Ip, J] - p[Im, J]) +
                        nu * (dt / dx ** 2) * (v_prev[I, Jp] - 2 * v_prev[I, J] + v_prev[I, Jm]) +
                        nu * (dt / dy ** 2) * (v_prev[Ip, J] - 2 * v_prev[I, J] + v_prev[Im, J]))
-
         # Check convergence
         u_diff = np.linalg.norm(u_new - u_prev)
         v_diff = np.linalg.norm(v_new - v_prev)
 
-        # Check convergence
         if u_diff < tol and v_diff < tol:
             break
 
@@ -76,5 +81,11 @@ def solve_nl_2d_navier_stokes_p_vectorized(ic, bc, nx, ny, Lx, Ly, nu, nt, dt):
 
         # Apply boundary conditions
         u, v = boundary_condition(bc, u, v)
+
+        # Apply boundary conditions for the pressure field for testing purpose
+        p[:, 0] = p[:, 1]
+        p[:, -1] = p[:, -2]
+        p[0, :] = p[1, :]
+        p[-1, :] = p[-2, :]
 
     return u, v, p
